@@ -2,9 +2,9 @@
 
 Eine interaktive Visualisierung der neurobiologischen Signalwege, die chronischen Stress mit Substanzgebrauchsstörungen verbinden, einschließlich therapeutischer Interventionspunkte.
 
-**[🚀 Live Demo](https://darealone.github.io/neural-pathway-visualization/)**
+**[🚀 Live Demo](https://darealone.github.io/Visualisierung-neuronaler-Bahnen)**
 
-[🇬🇧 English Version](README.md)
+[🇩🇪 German Version](README.md)
 
 ![Neuronales Netzwerk](screenshot.png)
 *Interaktives neuronales Netzwerk mit biochemischen Kaskaden und Interventionspunkten*
