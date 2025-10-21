@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neurochemisches Pfadnetzwerk - Interaktive Visualisierung</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #ffffff;
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        :root {
+            --header-height: 80px;
+        }
+
+        #header {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 300;
+            text-align: left;
+            flex: 1;
+            background: linear-gradient(90deg, #00d4ff, #ff00ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: gradientShift 5s ease infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% { filter: hue-rotate(0deg); }
+            50% { filter: hue-rotate(180deg); }
+        }
+
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: calc(var(--header-height) + 20px);
+            right: 20px;
+            width: 320px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 50;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .info-panel.active {
+            transform: translateX(0);
+        }
+
+        .info-panel h2 {
+            color: #00d4ff;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .info-panel .category {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 5px;
+            font-size: 0.8rem;
+            margin-bottom: 10px;
+        }
+
+        .info-panel .description {
+            line-height: 1.6;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+            color: #e0e0e0;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            z-index: 50;
+        }
+
+        .legend h3 {
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+            color: #00d4ff;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            font-size: 0.85rem;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
+            background: rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            padding: 10px 15px;
+        }
+
+        .control-btn {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid rgba(0, 212, 255, 0.3);
+            color: #00d4ff;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .control-btn:hover {
+            background: rgba(0, 212, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .control-btn.active {
+            background: rgba(0, 212, 255, 0.3);
+            border-color: #00d4ff;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 212, 255, 0.3);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 212, 255, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h1>Neurochemische Pfade: Von Stress zur Substanzgebrauchsstörung</h1>
+        <div class="controls">
+            <button class="control-btn active" onclick="toggleAnimation(this)">⏸ Animation pausieren</button>
+            <button class="control-btn pathway-btn" onclick="highlightPathway('stress', this)">🧠 Stress-Pfad</button>
+            <button class="control-btn pathway-btn" onclick="highlightPathway('therapeutic', this)">💊 Therapiepfad</button>
+            <button class="control-btn" onclick="resetView()">🔄 Ansicht zurücksetzen</button>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="network-canvas"></canvas>
+    </div>
+
+    <div class="info-panel" id="info-panel">
+        <h2 id="node-title">Knoten auswählen</h2>
+        <div class="category" id="node-category"></div>
+        <div class="description" id="node-description">
+            Erkunde das Netzwerk, indem du auf Knoten klickst, um mehr über die einzelnen Elemente des Pfades zu erfahren.
+        </div>
+        <div id="connections"></div>
+    </div>
+
+    <div class="legend">
+        <h3>Knotentypen</h3>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ff6b6b;"></div>
+            <span>Stress- und schädliche Pfade</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #4ecdc4;"></div>
+            <span>Therapeutische Interventionen</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ffd93d;"></div>
+            <span>Neurotransmitter</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #a855f7;"></div>
+            <span>Rezeptorsysteme</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ff9a00;"></div>
+            <span>Substanzen</span>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('network-canvas');
+        const ctx = canvas.getContext('2d');
+        const header = document.getElementById('header');
+        const pathwayButtons = Array.from(document.querySelectorAll('.pathway-btn'));
+        let width, height;
+        let animationId;
+        let isAnimating = true;
+        let mouseX = 0, mouseY = 0;
+        let selectedNode = null;
+        let hoveredNode = null;
+        let particles = [];
+        let time = 0;
+        let activePathway = null;
+
+        // Node data structure
+        const nodes = [
+            // Core pathway nodes
+            { id: 'stress', x: 0.2, y: 0.2, label: 'Stress', type: 'trigger', color: '#ff6b6b', size: 40,
+              description: 'Psychologischer und physiologischer Stress löst die Kaskade aus. Dadurch werden HPA-Achse und Entzündungsreaktionen aktiviert, was zu einer verstärkten Tryptophan-Metabolisierung über den Kynureninweg führt.',
+              connections: ['tryptophan', 'psychotherapy'] },
+            
+            { id: 'tryptophan', x: 0.35, y: 0.3, label: 'Tryptophan', type: 'metabolite', color: '#ffd93d', size: 30,
+              description: 'Essenzielle Aminosäure und Vorstufe von Serotonin und Melatonin. Unter Stress wird sie verstärkt über den Kynureninweg statt zur Serotoninsynthese abgebaut.',
+              connections: ['kynurenine'] },
+            
+            { id: 'kynurenine', x: 0.5, y: 0.4, label: 'Kynurenin', type: 'metabolite', color: '#ffd93d', size: 30,
+              description: 'Wichtiger Metabolit im Tryptophan-Abbau. Erhöhte Kynurenin-Produktion steht mit Depression, Entzündung und neurodegenerativen Prozessen in Verbindung.',
+              connections: ['3hk'] },
+            
+            { id: '3hk', x: 0.5, y: 0.55, label: '3-Hydroxykynurenin', type: 'metabolite', color: '#ff9a00', size: 25,
+              description: 'Neurotoxisches Metabolit, das freie Radikale erzeugt und zu oxidativem Stress im Gehirn beiträgt.',
+              connections: ['quinolinic'] },
+            
+            { id: 'quinolinic', x: 0.5, y: 0.7, label: 'Quinolinsäure', type: 'neurotoxin', color: '#ff6b6b', size: 35,
+              description: 'Aktiviert NMDA-Rezeptoren, verursacht Exzitotoxizität, Neuroinflammation und Zelltod. Zentraler Bestandteil des neurotoxischen Zweigs des Kynurenin-Stoffwechsels.',
+              connections: ['neurotoxicity', 'dopamine'] },
+            
+            { id: 'neurotoxicity', x: 0.65, y: 0.75, label: 'Neurotoxizität', type: 'effect', color: '#ff6b6b', size: 30,
+              description: 'Glutamat-Exzitotoxizität und eine dysregulierte HPA-Achse entstehen durch die Anhäufung von Quinolinsäure, schädigen Nervenzellen und verändern Hirnnetzwerke.',
+              connections: ['dopamine'] },
+            
+            { id: 'dopamine', x: 0.5, y: 0.85, label: '↑ Dopamin', type: 'neurotransmitter', color: '#ffd93d', size: 35,
+              description: 'Dysregulierte Dopamin-Signale in den Belohnungspfaden. Anfangs durch Substanzen erhöht, führt dies langfristig zu Toleranz und Abhängigkeit.',
+              connections: ['deltafosb'] },
+            
+            { id: 'deltafosb', x: 0.5, y: 0.95, label: '↑ ΔFosB', type: 'transcription', color: '#ff9a00', size: 30,
+              description: 'Transkriptionsfaktor, der sich bei chronischem Substanzkonsum ansammelt und langanhaltende Veränderungen der Genexpression sowie neuronaler Plastizität auslöst.',
+              connections: ['sud'] },
+            
+            { id: 'sud', x: 0.5, y: 1.05, label: 'Substanzgebrauchsstörung', type: 'outcome', color: '#ff6b6b', size: 45,
+              description: 'Endpunkt dieser Kaskade: gekennzeichnet durch zwanghaftes Suchverhalten, Kontrollverlust und negative emotionale Zustände ohne Konsum.',
+              connections: [] },
+            
+            // Therapeutic interventions
+            { id: 'psychotherapy', x: 0.1, y: 0.1, label: 'Psychotherapie', type: 'therapeutic', color: '#4ecdc4', size: 35,
+              description: 'Evidenzbasierte Verfahren (KVT, DBT, EMDR), die helfen, Trauma zu verarbeiten, Stress zu regulieren und gesunde Bewältigungsstrategien zu entwickeln.',
+              connections: ['stress', 'mystical'] },
+            
+            { id: 'mystical', x: 0.05, y: 0.25, label: 'Mystische Erfahrungen', type: 'therapeutic', color: '#4ecdc4', size: 30,
+              description: 'Tiefgreifende Erlebnisse von Einheit, Transzendenz und Sinn, die in Therapie oder mit Psychedelika auftreten und nachhaltige positive Veränderungen ermöglichen.',
+              connections: ['stress'] },
+            
+            { id: 'ketamine', x: 0.25, y: 0.65, label: 'Ketamin', type: 'therapeutic', color: '#4ecdc4', size: 30,
+              description: 'NMDA-Antagonist mit rasch einsetzender antidepressiver Wirkung. Dämpft die schädlichen Effekte von Quinolinsäure und fördert Neuroplastizität.',
+              connections: ['quinolinic'] },
+            
+            { id: 'ibogaine_ket', x: 0.15, y: 0.7, label: 'Ibogaine', type: 'therapeutic', color: '#4ecdc4', size: 28,
+              description: 'Stark anti-suchtwirksame Substanz, setzt die Opioidtoleranz zurück und ermöglicht psychologische Einsichten. Wirkt auf mehrere Neurotransmittersysteme.',
+              connections: ['quinolinic', 'mglu2'] },
+            
+            // Psychedelics
+            { id: 'psychedelics', x: 0.85, y: 0.3, label: 'Klassische Psychedelika', type: 'psychedelic', color: '#a855f7', size: 40,
+              description: 'Psilocybin, LSD, Ayahuasca, Peyote - 5-HT2A-Agonisten, die Neuroplastizität fördern und therapeutische Durchbrüche anstoßen können.',
+              connections: ['mglu2'] },
+            
+            { id: 'ibogaine_psy', x: 0.9, y: 0.4, label: 'Ibogaine', type: 'psychedelic', color: '#a855f7', size: 28,
+              description: 'Atypisches Psychedelikum mit einzigartigen anti-addiktiven Eigenschaften und Wirkung auf mehrere Rezeptorsysteme wie NMDA, Opioid und Serotonin.',
+              connections: ['mglu2'] },
+            
+            { id: 'mdma', x: 0.95, y: 0.35, label: 'MDMA', type: 'psychedelic', color: '#a855f7', size: 28,
+              description: 'Empathogen, das Serotonin, Dopamin und Noradrenalin freisetzt. Zeigt Potenzial in der PTSD-Behandlung, indem es emotionale Verarbeitung erleichtert.',
+              connections: ['mglu2'] },
+            
+            { id: 'mglu2', x: 0.75, y: 0.5, label: '↓ mGlu2-Funktion', type: 'receptor', color: '#a855f7', size: 32,
+              description: 'Metabotroper Glutamatrezeptor 2 - Psychedelika reduzieren seine Funktion, erhöhen die Glutamatfreisetzung und verändern das Bewusstsein.',
+              connections: ['dopamine', 'neurotoxicity'] },
+            
+            // Addictive substances
+            { id: 'substances', x: 0.8, y: 0.9, label: 'Suchtmittel', type: 'substance', color: '#ff9a00', size: 38,
+              description: 'Nikotin, Alkohol, Opioide, Kokain usw. - trotz unterschiedlicher Mechanismen wirken alle auf die dopaminergen Belohnungspfade.',
+              connections: ['dopamine'] }
+        ];
+
+        // Connections/edges
+        const edges = [];
+        nodes.forEach(node => {
+            node.connections.forEach(targetId => {
+                const target = nodes.find(n => n.id === targetId);
+                if (target) {
+                    edges.push({ source: node, target: target });
+                }
+            });
+        });
+
+        function resizeCanvas() {
+            const headerHeight = header.offsetHeight;
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = Math.max(window.innerHeight - headerHeight, 300);
+            document.documentElement.style.setProperty('--header-height', `${headerHeight}px`);
+        }
+
+        function getNodePosition(node) {
+            return {
+                x: node.x * width,
+                y: (node.y - 0.05) * height
+            };
+        }
+
+        function drawGlow(x, y, radius, color, intensity = 1) {
+            const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius * 2);
+            gradient.addColorStop(0, color + '40');
+            gradient.addColorStop(0.5, color + '20');
+            gradient.addColorStop(1, 'transparent');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(x - radius * 2, y - radius * 2, radius * 4, radius * 4);
+        }
+
+        function drawNode(node) {
+            const pos = getNodePosition(node);
+            const isHovered = hoveredNode === node;
+            const isSelected = selectedNode === node;
+            const isHighlighted = node.highlighted;
+            const highlightActive = Boolean(activePathway);
+            const pulseSize = Math.sin(time * 0.002 + node.x * 10) * 3;
+            const size = node.size + (isHovered ? 8 : 0) + (isSelected ? 5 : 0) + pulseSize;
+
+            if (isHighlighted) {
+                drawGlow(pos.x, pos.y, (size + 6) * 1.8, node.color, 1.8);
+            }
+            
+            // Draw glow effect
+            if (isSelected || isHovered) {
+                drawGlow(pos.x, pos.y, size * 1.5, node.color, isSelected ? 1.5 : 1);
+            }
+
+            ctx.save();
+            if (highlightActive && !isHighlighted && !isHovered && !isSelected) {
+                ctx.globalAlpha = 0.2;
+            }
+            
+            // Draw outer ring
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, size + 3, 0, Math.PI * 2);
+            ctx.strokeStyle = node.color + '60';
+            ctx.lineWidth = isHighlighted ? 3 : 2;
+            ctx.stroke();
+            
+            // Draw node circle
+            const gradient = ctx.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, size);
+            gradient.addColorStop(0, node.color + 'ff');
+            gradient.addColorStop(0.7, node.color + 'cc');
+            gradient.addColorStop(1, node.color + '99');
+            
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, size, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+            
+            // Draw border
+            ctx.strokeStyle = node.color;
+            ctx.lineWidth = isHovered ? 3 : 2;
+            ctx.stroke();
+            
+            // Draw label
+            ctx.globalAlpha = 1;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `${12 + (isHovered ? 2 : 0)}px 'Segoe UI', sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Word wrap for long labels
+            const words = node.label.split(' ');
+            if (words.length > 2) {
+                const line1 = words.slice(0, Math.ceil(words.length / 2)).join(' ');
+                const line2 = words.slice(Math.ceil(words.length / 2)).join(' ');
+                ctx.fillText(line1, pos.x, pos.y - 7);
+                ctx.fillText(line2, pos.x, pos.y + 7);
+            } else {
+                ctx.fillText(node.label, pos.x, pos.y);
+            }
+
+            ctx.restore();
+        }
+
+        function drawEdge(edge, progress = 1) {
+            const sourcePos = getNodePosition(edge.source);
+            const targetPos = getNodePosition(edge.target);
+            const highlightActive = Boolean(activePathway);
+            const isEdgeHighlighted = edge.source.highlighted && edge.target.highlighted;
+
+            ctx.save();
+            if (highlightActive && !isEdgeHighlighted) {
+                ctx.globalAlpha = 0.1;
+            }
+            
+            // Calculate edge path with curve
+            const dx = targetPos.x - sourcePos.x;
+            const dy = targetPos.y - sourcePos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const midX = sourcePos.x + dx * 0.5;
+            const midY = sourcePos.y + dy * 0.5;
+            const curveX = midX + dy * 0.1;
+            const curveY = midY - dx * 0.1;
+            
+            // Draw edge glow
+            ctx.beginPath();
+            ctx.moveTo(sourcePos.x, sourcePos.y);
+            ctx.quadraticCurveTo(curveX, curveY, targetPos.x, targetPos.y);
+            ctx.strokeStyle = edge.source.color + '20';
+            ctx.lineWidth = 8;
+            ctx.stroke();
+            
+            // Draw main edge
+            ctx.beginPath();
+            ctx.moveTo(sourcePos.x, sourcePos.y);
+            ctx.quadraticCurveTo(curveX, curveY, targetPos.x, targetPos.y);
+            
+            const gradient = ctx.createLinearGradient(sourcePos.x, sourcePos.y, targetPos.x, targetPos.y);
+            gradient.addColorStop(0, edge.source.color + '99');
+            gradient.addColorStop(1, edge.target.color + '99');
+            
+            ctx.strokeStyle = gradient;
+            ctx.lineWidth = highlightActive && isEdgeHighlighted ? 3 : 2;
+            ctx.setLineDash([]);
+            ctx.stroke();
+            
+            // Draw arrow
+            const arrowSize = 8;
+            const angle = Math.atan2(targetPos.y - curveY, targetPos.x - curveX);
+            const arrowX = targetPos.x - Math.cos(angle) * (edge.target.size + 5);
+            const arrowY = targetPos.y - Math.sin(angle) * (edge.target.size + 5);
+            
+            ctx.save();
+            ctx.translate(arrowX, arrowY);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-arrowSize, -arrowSize/2);
+            ctx.lineTo(-arrowSize, arrowSize/2);
+            ctx.closePath();
+            ctx.fillStyle = edge.target.color;
+            ctx.fill();
+            ctx.restore();
+
+            if (highlightActive && isEdgeHighlighted) {
+                drawGlow(midX, midY, 20, edge.source.color, 0.6);
+            }
+
+            ctx.restore();
+        }
+
+        class Particle {
+            constructor(edge) {
+                this.edge = edge;
+                this.progress = 0;
+                this.speed = 0.5 + Math.random() * 0.5;
+                this.size = 3 + Math.random() * 3;
+                this.color = edge.source.color;
+            }
+            
+            update() {
+                this.progress += this.speed * 0.01;
+                if (this.progress > 1) {
+                    this.progress = 0;
+                }
+            }
+            
+            draw() {
+                const sourcePos = getNodePosition(this.edge.source);
+                const targetPos = getNodePosition(this.edge.target);
+                const dx = targetPos.x - sourcePos.x;
+                const dy = targetPos.y - sourcePos.y;
+                const midX = sourcePos.x + dx * 0.5;
+                const midY = sourcePos.y + dy * 0.5;
+                const curveX = midX + dy * 0.1;
+                const curveY = midY - dx * 0.1;
+                
+                // Calculate position along quadratic curve
+                const t = this.progress;
+                const x = (1-t)*(1-t)*sourcePos.x + 2*(1-t)*t*curveX + t*t*targetPos.x;
+                const y = (1-t)*(1-t)*sourcePos.y + 2*(1-t)*t*curveY + t*t*targetPos.y;
+                
+                // Draw particle with glow
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, this.size * 2);
+                gradient.addColorStop(0, this.color + 'ff');
+                gradient.addColorStop(0.5, this.color + '80');
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(x, y, this.size * 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            edges.forEach(edge => {
+                for (let i = 0; i < 2; i++) {
+                    const particle = new Particle(edge);
+                    particle.progress = Math.random();
+                    particles.push(particle);
+                }
+            });
+        }
+
+        function updateInfoPanel(node) {
+            const panel = document.getElementById('info-panel');
+            const title = document.getElementById('node-title');
+            const category = document.getElementById('node-category');
+            const description = document.getElementById('node-description');
+            const connections = document.getElementById('connections');
+            
+            if (node) {
+                title.textContent = node.label;
+                
+                // Set category style
+                const categoryColors = {
+                    'trigger': { bg: '#ff6b6b', text: 'Auslöser' },
+                    'metabolite': { bg: '#ffd93d', text: 'Metabolit' },
+                    'neurotoxin': { bg: '#ff6b6b', text: 'Neurotoxin' },
+                    'effect': { bg: '#ff9a00', text: 'Auswirkung' },
+                    'neurotransmitter': { bg: '#ffd93d', text: 'Neurotransmitter' },
+                    'transcription': { bg: '#ff9a00', text: 'Transkriptionsfaktor' },
+                    'outcome': { bg: '#ff6b6b', text: 'Ergebnis' },
+                    'therapeutic': { bg: '#4ecdc4', text: 'Therapeutisch' },
+                    'psychedelic': { bg: '#a855f7', text: 'Psychedelisch' },
+                    'receptor': { bg: '#a855f7', text: 'Rezeptor' },
+                    'substance': { bg: '#ff9a00', text: 'Substanz' }
+                };
+                
+                const cat = categoryColors[node.type];
+                category.textContent = cat.text;
+                category.style.background = cat.bg + '30';
+                category.style.border = `1px solid ${cat.bg}`;
+                category.style.color = cat.bg;
+                
+                description.textContent = node.description;
+                
+                // Show connections
+                if (node.connections.length > 0) {
+                    const connectedNodes = node.connections.map(id => 
+                        nodes.find(n => n.id === id)?.label
+                    ).filter(Boolean);
+                    
+                    connections.innerHTML = `
+                        <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                            <h3 style="color: #00d4ff; font-size: 1rem; margin-bottom: 8px;">Verbindungen:</h3>
+                            <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                                ${connectedNodes.map(name => 
+                                    `<span style="background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3); 
+                                     padding: 3px 8px; border-radius: 5px; font-size: 0.85rem;">${name}</span>`
+                                ).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    connections.innerHTML = '';
+                }
+                
+                panel.classList.add('active');
+            } else {
+                panel.classList.remove('active');
+            }
+        }
+
+        function findNodeAtPosition(x, y) {
+            for (const node of nodes) {
+                const pos = getNodePosition(node);
+                const dx = x - pos.x;
+                const dy = y - pos.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance <= node.size + 5) {
+                    return node;
+                }
+            }
+            return null;
+        }
+
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            
+            const node = findNodeAtPosition(mouseX, mouseY);
+            if (node !== hoveredNode) {
+                hoveredNode = node;
+                canvas.style.cursor = node ? 'pointer' : 'default';
+            }
+        }
+
+        function handleMouseClick(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const node = findNodeAtPosition(x, y);
+            if (node) {
+                selectedNode = node;
+                updateInfoPanel(node);
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            
+            // Update time
+            if (isAnimating) {
+                time++;
+            }
+            
+            // Draw edges
+            edges.forEach(edge => drawEdge(edge));
+            
+            // Update and draw particles
+            if (isAnimating) {
+                particles.forEach(particle => {
+                    particle.update();
+                    particle.draw();
+                });
+            }
+            
+            // Draw nodes
+            nodes.forEach(node => drawNode(node));
+            
+            animationId = requestAnimationFrame(animate);
+        }
+
+        function toggleAnimation(btn) {
+            isAnimating = !isAnimating;
+            if (btn) {
+                btn.textContent = isAnimating ? '⏸ Animation pausieren' : '▶ Animation starten';
+                btn.classList.toggle('active', isAnimating);
+            }
+        }
+
+        function highlightPathway(type, btn) {
+            if (activePathway === type) {
+                resetView();
+                return;
+            }
+
+            activePathway = type;
+            // Reset all nodes
+            nodes.forEach(node => {
+                node.highlighted = false;
+            });
+            
+            if (type === 'stress') {
+                // Highlight main stress pathway
+                ['stress', 'tryptophan', 'kynurenine', '3hk', 'quinolinic', 'neurotoxicity', 'dopamine', 'deltafosb', 'sud'].forEach(id => {
+                    const node = nodes.find(n => n.id === id);
+                    if (node) node.highlighted = true;
+                });
+            } else if (type === 'therapeutic') {
+                // Highlight therapeutic interventions
+                nodes.filter(n => n.type === 'therapeutic' || n.type === 'psychedelic').forEach(node => {
+                    node.highlighted = true;
+                });
+            }
+
+            if (btn) {
+                pathwayButtons.forEach(button => button.classList.toggle('active', button === btn));
+            }
+
+            selectedNode = null;
+            updateInfoPanel(null);
+        }
+
+        function resetView() {
+            selectedNode = null;
+            hoveredNode = null;
+            activePathway = null;
+            nodes.forEach(node => node.highlighted = false);
+            updateInfoPanel(null);
+            pathwayButtons.forEach(button => button.classList.remove('active'));
+        }
+
+        // Initialize
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
+        
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('click', handleMouseClick);
+        
+        resizeCanvas();
+        initParticles();
+        animate();
+    </script>
+</body>
+</html>
